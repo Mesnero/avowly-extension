@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [chrome, firefox]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: matrix.target == 'chrome'
+        run: pnpm lint
+
+      - name: Typecheck
+        if: matrix.target == 'chrome'
+        run: pnpm typecheck
+
+      - name: Test
+        if: matrix.target == 'chrome'
+        run: pnpm test
+
+      - name: Build (${{ matrix.target }})
+        run: |
+          if [ "${{ matrix.target }}" = "firefox" ]; then
+            pnpm build:firefox
+          else
+            pnpm build
+          fi
+
+      - name: Bundle size check
+        if: matrix.target == 'chrome'
+        run: pnpm size
+
+      - name: Zip extension
+        run: |
+          if [ "${{ matrix.target }}" = "firefox" ]; then
+            pnpm zip:firefox
+          else
+            pnpm zip
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: avowly-${{ matrix.target }}
+          path: .output/*.zip
+          retention-days: 14
+
+  format-check:
+    name: Prettier
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check

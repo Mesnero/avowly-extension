@@ -1,0 +1,35 @@
+# Git hooks managed by lefthook (https://lefthook.dev).
+# Install once with: pnpm exec lefthook install
+#
+# Lint runs across the full project (`pnpm lint`) rather than only staged
+# files: ESLint's flat config relies on `tsconfig.json`'s project service
+# for type-aware rules, and feeding it an arbitrary subset of files
+# breaks parser-project resolution. The repo is small enough that the
+# whole-project lint stays fast.
+#
+# Prettier runs against staged files only — it has no per-file context
+# and is the cheap path.
+
+pre-commit:
+  parallel: true
+  commands:
+    prettier-staged:
+      glob: '*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml,html,css}'
+      run: pnpm exec prettier --write {staged_files}
+      stage_fixed: true
+    lint:
+      glob: '*.{ts,tsx,js,mjs,cjs}'
+      run: pnpm lint
+    typecheck:
+      glob: '*.{ts,tsx}'
+      run: pnpm typecheck
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+
+pre-push:
+  commands:
+    test:
+      run: pnpm test

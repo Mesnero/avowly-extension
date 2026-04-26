@@ -1,0 +1,12 @@
+[
+  {
+    "name": "background service worker",
+    "path": ".output/chrome-mv3/background.js",
+    "limit": "60 KB"
+  },
+  {
+    "name": "popup bundle",
+    "path": ".output/chrome-mv3/popup.html",
+    "limit": "200 KB"
+  }
+]

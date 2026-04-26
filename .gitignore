@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# wxt
+.output/
+.wxt/
+
+# Build artifacts
+dist/
+build/
+*.zip
+*.tsbuildinfo
+
+# Test
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
