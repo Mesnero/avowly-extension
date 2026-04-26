@@ -47,6 +47,17 @@ export function bootstrap(): AdapterHandle | undefined {
 
 function buildContext(adapter: PlatformAdapter, signal: AbortSignal): AdapterContext {
   const log = createLogger(`adapter:${adapter.id}`);
+
+  // `reportError` posts a `capture/error` to the background worker so the
+  // popup's error view can surface failures to the user. Defined first so
+  // `emit` can call it on send failure.
+  const reportError = (reason: string): void => {
+    sendToBackground({ kind: 'capture/error', platform: adapter.id, reason }).catch(() => {
+      /* If even the error report can't reach the background, we have no
+         channel left to the user. Logged in the catch above already. */
+    });
+  };
+
   return {
     emit: (prompt) => {
       const enriched: CapturedPrompt = {
@@ -54,14 +65,14 @@ function buildContext(adapter: PlatformAdapter, signal: AbortSignal): AdapterCon
         extensionVersion: chrome.runtime.getManifest().version,
       };
       sendToBackground({ kind: 'capture/prompt', prompt: enriched }).catch((err: unknown) => {
-        log.error('emit failed', { err: err instanceof Error ? err.message : String(err) });
+        const message = err instanceof Error ? err.message : String(err);
+        log.error('emit failed', { err: message });
+        // Don't let the failure disappear into the void — surface it as a
+        // capture/error so the popup can flag it to the user.
+        reportError(`send failed: ${message}`);
       });
     },
-    reportError: (reason) => {
-      sendToBackground({ kind: 'capture/error', platform: adapter.id, reason }).catch(() => {
-        /* swallow — already logged elsewhere */
-      });
-    },
+    reportError,
     log,
     signal,
   };

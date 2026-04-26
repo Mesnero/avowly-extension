@@ -15,6 +15,16 @@ export default defineConfig({
     globals: false,
     include: ['test/**/*.test.ts', 'test/**/*.test.tsx', 'src/**/*.test.ts', 'src/**/*.test.tsx'],
     setupFiles: ['./test/setup.ts'],
+    // Provide the WXT public env vars so any module that transitively imports
+    // src/lib/env.ts at module-load time gets a valid configuration. Without
+    // this, a bare `import { something } from '...'` chain that touches the
+    // logger crashes at import time with an opaque "Invalid extension env"
+    // error rather than a clean test failure. Tests that exercise env-loading
+    // behavior should use vi.mock('../src/lib/env.js', ...) explicitly.
+    env: {
+      WXT_PUBLIC_API_BASE_URL: 'https://api.test.avowly.io',
+      WXT_PUBLIC_DEBUG: 'false',
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

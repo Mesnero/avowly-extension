@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { handleMessage } from '../src/background/index.js';
-import { CaptureError } from '../src/lib/errors.js';
+import { AuthError, CaptureError } from '../src/lib/errors.js';
 import { uuidv7 } from '../src/lib/ids.js';
 import { db } from '../src/lib/queue.js';
 import { defaultSettings, setSettings } from '../src/lib/settings.js';
@@ -45,6 +45,35 @@ describe('handleMessage — envelope validation', () => {
 
   it('throws CaptureError on a missing kind', async () => {
     await expect(handleMessage({}, sender)).rejects.toBeInstanceOf(CaptureError);
+  });
+});
+
+describe('handleMessage — sender trust boundary', () => {
+  it('rejects messages from another extension or a connected web page', async () => {
+    const foreignSender = {
+      id: 'malicious-extension-id',
+      tab: { id: 1, url: 'https://attacker.example' } as chrome.tabs.Tab,
+    };
+    await expect(handleMessage(validPromptMessage(), foreignSender)).rejects.toBeInstanceOf(
+      AuthError,
+    );
+    expect(await db.prompts.count()).toBe(0);
+  });
+
+  it('accepts messages whose sender.id matches the extension', async () => {
+    const ownSender = {
+      id: chrome.runtime.id,
+      tab: { id: 1, url: 'https://chat.openai.com/c/abc' } as chrome.tabs.Tab,
+    };
+    const reply = await handleMessage(validPromptMessage(), ownSender);
+    expect(reply).toEqual({ ok: true });
+  });
+
+  it('accepts messages with no sender.id (in-extension contexts: popup, options, content scripts)', async () => {
+    // In real Chrome, content scripts and extension pages may produce a
+    // sender object without a top-level `id` set. Treat undefined as trusted.
+    const reply = await handleMessage(validPromptMessage(), {});
+    expect(reply).toEqual({ ok: true });
   });
 });
 

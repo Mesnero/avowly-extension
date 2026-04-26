@@ -19,6 +19,13 @@ import type { CapturedPrompt, PlatformId } from '../lib/schemas.js';
  *  - Send anything to the API directly (the background worker does that)
  *  - Persist anything (the queue is the background's job)
  *  - Run in incognito (handled by the manifest + a runtime check in the bootstrap)
+ *  - Read prompt text from DOM attributes the host page can manipulate
+ *    (data-*, title, aria-label, dataset, hidden inputs the page has set).
+ *    Always read from the actual user-input element's `.value` /
+ *    `.textContent` AT submit-time. The adapter is the trust boundary
+ *    between an untrusted page DOM and our typed `CapturedPrompt`.
+ *  - Capture text outside the user's input area (e.g., system-prompt
+ *    panels, prefill text the page injected, suggested-prompt buttons).
  */
 export interface PlatformAdapter {
   /** Stable id sent to the API and used in metrics. */

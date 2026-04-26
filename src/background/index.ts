@@ -1,4 +1,4 @@
-import { CaptureError, toExtensionError } from '../lib/errors.js';
+import { AuthError, CaptureError, toExtensionError } from '../lib/errors.js';
 import { createLogger } from '../lib/logger.js';
 import { enqueue, size } from '../lib/queue.js';
 import { ExtensionMessage } from '../lib/schemas.js';
@@ -55,6 +55,17 @@ export async function handleMessage(
   raw: unknown,
   sender: chrome.runtime.MessageSender,
 ): Promise<{ ok: true; data?: unknown }> {
+  // Trust-boundary check: only accept messages from our own content scripts,
+  // popup, or options page. Without `externally_connectable` declared the
+  // browser already refuses cross-extension `sendMessage` on Chromium, but
+  // Firefox is more permissive and a public extension ID is easy to discover.
+  // `sender.id` is set by the browser and cannot be spoofed by a web page.
+  if (sender.id !== undefined && sender.id !== chrome.runtime.id) {
+    throw new AuthError('Message rejected: untrusted sender', {
+      meta: { senderId: sender.id },
+    });
+  }
+
   const parsed = ExtensionMessage.safeParse(raw);
   if (!parsed.success) {
     throw new CaptureError('Invalid message envelope', { meta: { issues: parsed.error.issues } });

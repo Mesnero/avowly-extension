@@ -1,5 +1,7 @@
 import { defineConfig } from 'wxt';
 
+import pkg from './package.json' with { type: 'json' };
+
 /**
  * wxt config — single source of truth for the extension build.
  *
@@ -20,7 +22,10 @@ export default defineConfig({
     short_name: 'Avowly',
     description:
       'Capture, control, and earn from your AI chat prompts. You decide what is shared, with whom, and what you get back.',
-    version: '0.0.0',
+    // Sourced from package.json so a bumped release tag automatically becomes
+    // the manifest version (Chrome Web Store and AMO both reject duplicate
+    // versions). Keep `version` in package.json as the single source of truth.
+    version: pkg.version,
     // Split incognito so the (disabled) extension instance in incognito cannot
     // capture data — we never run there.
     incognito: 'split',

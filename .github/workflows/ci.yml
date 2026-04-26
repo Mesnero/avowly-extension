@@ -44,6 +44,15 @@ jobs:
         if: matrix.target == 'chrome'
         run: pnpm test
 
+      - name: Upload coverage report
+        if: matrix.target == 'chrome' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.run_id }}
+          path: coverage/
+          retention-days: 14
+          if-no-files-found: ignore
+
       - name: Build (${{ matrix.target }})
         run: |
           if [ "${{ matrix.target }}" = "firefox" ]; then

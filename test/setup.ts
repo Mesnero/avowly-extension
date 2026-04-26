@@ -46,6 +46,7 @@ beforeEach(() => {
   globalThis.chrome = {
     storage: { sync, local, session },
     runtime: {
+      id: 'avowly-test-extension-id',
       getManifest: () => ({ version: '0.0.0-test' }) as chrome.runtime.Manifest,
       sendMessage: vi.fn(() => Promise.resolve(undefined)),
       onMessage: { addListener: vi.fn(), removeListener: vi.fn() },
