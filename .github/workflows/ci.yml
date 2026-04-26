@@ -92,3 +92,18 @@ jobs:
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
+
+  audit:
+    name: pnpm audit (production deps)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Production deps only — devDependency advisories rarely affect a
+      # built artifact and Renovate keeps both groups patched separately.
+      - run: pnpm audit --prod --audit-level=high

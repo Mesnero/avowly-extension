@@ -27,5 +27,9 @@
       "addLabels": ["dependencies-major"],
       "minimumReleaseAge": "7 days"
     }
-  ]
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  }
 }
