@@ -3,6 +3,38 @@ import { defineConfig } from 'wxt';
 import pkg from './package.json' with { type: 'json' };
 
 /**
+ * Build-time guards on the public env. These run in Node before Vite
+ * bundles, unlike the runtime checks in `src/lib/env.ts` which only
+ * fire when a browser evaluates the artifact. The runtime checks are
+ * still kept (defence in depth — they catch a corrupted bundle that
+ * somehow shipped) but the build-time pass is what actually fails CI
+ * for a misconfigured release.
+ */
+function assertProductionPublicEnv(mode: string): void {
+  if (mode !== 'production') return;
+  const apiUrl = process.env.WXT_PUBLIC_API_BASE_URL ?? '';
+  const debug = process.env.WXT_PUBLIC_DEBUG ?? '';
+  const issues: string[] = [];
+  if (!apiUrl.startsWith('https://')) {
+    issues.push(
+      'WXT_PUBLIC_API_BASE_URL must be set to an https:// URL for production builds (got: ' +
+        (apiUrl === '' ? '<empty>' : apiUrl) +
+        ')',
+    );
+  } else if (/^https:\/\/(localhost|127\.0\.0\.1)/i.test(apiUrl)) {
+    issues.push('WXT_PUBLIC_API_BASE_URL must not point at localhost in production builds');
+  }
+  if (debug === 'true' || debug === '1') {
+    issues.push(
+      'WXT_PUBLIC_DEBUG must not be enabled in production builds (would log URLs to console.debug on every page load)',
+    );
+  }
+  if (issues.length > 0) {
+    throw new Error('Refusing to build extension:\n  - ' + issues.join('\n  - '));
+  }
+}
+
+/**
  * wxt config — single source of truth for the extension build.
  *
  * Targets:
@@ -15,6 +47,11 @@ import pkg from './package.json' with { type: 'json' };
  * adapter's own file and add the host permission below.
  */
 export default defineConfig({
+  hooks: {
+    'build:before': (wxt) => {
+      assertProductionPublicEnv(wxt.config.mode);
+    },
+  },
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
   manifest: ({ browser }) => ({

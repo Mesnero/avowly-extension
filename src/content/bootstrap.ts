@@ -65,11 +65,19 @@ function buildContext(adapter: PlatformAdapter, signal: AbortSignal): AdapterCon
         extensionVersion: chrome.runtime.getManifest().version,
       };
       sendToBackground({ kind: 'capture/prompt', prompt: enriched }).catch((err: unknown) => {
+        // Log the raw error message *only* to the adapter-scoped
+        // logger (DevTools-only). Do NOT propagate `err.message` to
+        // `reportError` — that string ends up in `capture/error.reason`
+        // which traverses the trust boundary into the background log.
+        // While today's Chromium runtime doesn't echo payload bytes
+        // back in send-error messages, that is an implementation
+        // detail we shouldn't depend on; one browser change away,
+        // a `String(err)` here could pull in serialized prompt text.
+        // A static label is sufficient for the popup to flag a
+        // failure to the user.
         const message = err instanceof Error ? err.message : String(err);
         log.error('emit failed', { err: message });
-        // Don't let the failure disappear into the void — surface it as a
-        // capture/error so the popup can flag it to the user.
-        reportError(`send failed: ${message}`);
+        reportError('send failed');
       });
     },
     reportError,

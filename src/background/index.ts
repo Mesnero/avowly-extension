@@ -59,10 +59,17 @@ export async function handleMessage(
   // popup, or options page. Without `externally_connectable` declared the
   // browser already refuses cross-extension `sendMessage` on Chromium, but
   // Firefox is more permissive and a public extension ID is easy to discover.
-  // `sender.id` is set by the browser and cannot be spoofed by a web page.
-  if (sender.id !== undefined && sender.id !== chrome.runtime.id) {
+  //
+  // Both Chromium and Firefox always populate `sender.id` with the
+  // origin extension's id for any in-extension message (content
+  // script, popup, options page). A `sender.id` that is `undefined`
+  // or anything other than `chrome.runtime.id` is therefore not from
+  // our extension and must be rejected. The previous form
+  // (`!== undefined && !== runtime.id`) treated `undefined` as
+  // trusted based on a misreading of MessageSender; close that gap.
+  if (sender.id !== chrome.runtime.id) {
     throw new AuthError('Message rejected: untrusted sender', {
-      meta: { senderId: sender.id },
+      meta: { senderId: sender.id ?? null },
     });
   }
 

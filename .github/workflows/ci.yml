@@ -22,6 +22,19 @@ jobs:
       fail-fast: false
       matrix:
         target: [chrome, firefox]
+    env:
+      # Bake the API origin into the build. Falls back to the public
+      # production URL so PRs from forks (where org variables are not
+      # exposed) still produce a buildable artifact rather than a
+      # bundle that throws at module load.
+      #
+      # The repo variable `API_BASE_URL` lets the maintainer override
+      # this without pushing a code change (e.g. for staging builds).
+      WXT_PUBLIC_API_BASE_URL: ${{ vars.API_BASE_URL || 'https://api.avowly.io' }}
+      # Never enable verbose console logging in CI-produced artifacts.
+      # env.ts refuses to build a `MODE === 'production'` bundle with
+      # this set to true; we keep it explicit anyway.
+      WXT_PUBLIC_DEBUG: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

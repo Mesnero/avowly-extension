@@ -39,7 +39,16 @@ export type CapturedPrompt = z.infer<typeof CapturedPrompt>;
  */
 export const ExtensionMessage = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('capture/prompt'), prompt: CapturedPrompt }),
-  z.object({ kind: z.literal('capture/error'), platform: PlatformId, reason: z.string() }),
+  // `reason` is bounded so a hostile page can't push an arbitrarily
+  // large error string through the trust boundary into background
+  // logs (where it would land in the extension's DevTools console
+  // and balloon log volume). 512 chars is enough for any
+  // human-readable adapter error description.
+  z.object({
+    kind: z.literal('capture/error'),
+    platform: PlatformId,
+    reason: z.string().min(1).max(512),
+  }),
   z.object({ kind: z.literal('queue/status') }),
   z.object({ kind: z.literal('settings/get') }),
   z.object({

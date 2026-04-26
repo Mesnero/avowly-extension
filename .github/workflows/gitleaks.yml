@@ -13,17 +13,35 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      GITLEAKS_VERSION: '8.21.4'
+      # SHA-256 of gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz from the
+      # official release checksums file. Bump in lockstep with GITLEAKS_VERSION.
+      GITLEAKS_SHA256: '3e169b49f7c519a269b8ff653c5248a8c82e8c74baaf035286915047200386a9'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # Direct args so the exit-code behaviour is unambiguous: --exit-code=1
-      # makes a finding fail the workflow step. The OSS-mode GitHub Action
-      # only fails when the (commercial) GITLEAKS_LICENSE secret is set,
-      # which we don't use.
+      # Run gitleaks as a downloaded binary, not via the
+      # `gitleaks-action@v2` wrapper. The wrapper accepts a custom `args`
+      # input but silently ignores it on OSS repos and exits 0 unless a
+      # commercial GITLEAKS_LICENSE secret is set — meaning the previous
+      # `--exit-code=1` flag was never honoured. Using the CLI directly
+      # makes the failure semantics unambiguous: any finding exits 1
+      # and fails the workflow.
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" -o gitleaks.tgz
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks
+          install -m 0755 gitleaks /usr/local/bin/gitleaks
+          gitleaks version
       - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          args: detect --source . --no-banner --redact --verbose --exit-code=1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gitleaks detect \
+            --source . \
+            --no-banner \
+            --redact \
+            --verbose \
+            --exit-code=1

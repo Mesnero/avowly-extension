@@ -1,3 +1,17 @@
+# Dependabot ownership: GitHub Actions ONLY.
+#
+# Why no `npm` ecosystem here: Renovate (renovate.json at the repo root)
+# is the single owner of npm/pnpm dependency updates and security
+# advisories — including `vulnerabilityAlerts` which fires immediately
+# for high-severity CVEs. Adding Dependabot for npm would produce
+# duplicate PRs and conflicting branch lifecycles.
+#
+# CI gates as the runtime backstop: `pnpm audit --prod
+# --audit-level=high` runs on every PR, so a CVE that slips through
+# both update systems still fails the build.
+#
+# If Renovate is ever removed, replace this comment with an `npm`
+# entry below — don't run them in parallel.
 version: 2
 updates:
   - package-ecosystem: github-actions
