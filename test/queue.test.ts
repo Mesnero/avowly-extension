@@ -2,7 +2,18 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { uuidv7 } from '../src/lib/ids.js';
-import { db, enqueue, markFailure, peek, remove, size } from '../src/lib/queue.js';
+import {
+  db,
+  deadLetter,
+  deadLetterSize,
+  enqueue,
+  markFailure,
+  peek,
+  remove,
+  size,
+  stats,
+  totalSize,
+} from '../src/lib/queue.js';
 import type { CapturedPrompt } from '../src/lib/schemas.js';
 
 function makePrompt(overrides: Partial<CapturedPrompt> = {}): CapturedPrompt {
@@ -33,6 +44,8 @@ describe('queue.enqueue', () => {
     expect(row?.payload).toEqual(prompt);
     expect(row?.attempts).toBe(0);
     expect(row?.lastError).toBeNull();
+    expect(row?.deadLetteredAt).toBeNull();
+    expect(row?.deadLetterReason).toBeNull();
   });
 
   it('is idempotent on the prompt id (put-semantics)', async () => {
@@ -73,6 +86,20 @@ describe('queue.peek', () => {
   it('returns an empty array when the queue is empty', async () => {
     expect(await peek(10)).toEqual([]);
   });
+
+  it('skips dead-lettered rows without deleting them', async () => {
+    const bad = makePrompt({ text: 'bad' });
+    await enqueue(bad);
+    await enqueue(makePrompt({ text: 'good' }));
+
+    await deadLetter(bad.id, 'HTTP 400: invalid');
+
+    const active = await peek(10);
+    expect(active).toHaveLength(1);
+    expect(active[0]?.payload.text).toBe('good');
+    expect(await size()).toBe(1);
+    expect(await totalSize()).toBe(2);
+  });
 });
 
 describe('queue.markFailure', () => {
@@ -88,6 +115,22 @@ describe('queue.markFailure', () => {
   });
 });
 
+describe('queue.deadLetter', () => {
+  it('records permanent failure metadata and removes the row from peek', async () => {
+    const prompt = makePrompt();
+    await enqueue(prompt);
+
+    await deadLetter(prompt.id, 'HTTP 400: bad request');
+
+    const row = await db.prompts.get(prompt.id);
+    expect(row?.attempts).toBe(1);
+    expect(row?.lastError).toBe('HTTP 400: bad request');
+    expect(row?.deadLetterReason).toBe('HTTP 400: bad request');
+    expect(row?.deadLetteredAt).toEqual(expect.any(Number));
+    expect(await peek(10)).toEqual([]);
+  });
+});
+
 describe('queue.remove', () => {
   it('drops a row by id', async () => {
     const prompt = makePrompt();
@@ -99,10 +142,25 @@ describe('queue.remove', () => {
 });
 
 describe('queue.size', () => {
-  it('counts current rows', async () => {
+  it('counts only syncable rows', async () => {
     expect(await size()).toBe(0);
+    const dead = makePrompt();
+    await enqueue(dead);
     await enqueue(makePrompt());
+    await deadLetter(dead.id, 'HTTP 400: invalid');
+    expect(await size()).toBe(1);
+  });
+});
+
+describe('queue.stats', () => {
+  it('separates pending, dead-lettered, and total rows', async () => {
+    const dead = makePrompt();
+    await enqueue(dead);
     await enqueue(makePrompt());
-    expect(await size()).toBe(2);
+    await deadLetter(dead.id, 'HTTP 400: invalid');
+
+    expect(await deadLetterSize()).toBe(1);
+    expect(await totalSize()).toBe(2);
+    expect(await stats()).toEqual({ pending: 1, deadLettered: 1, total: 2 });
   });
 });
