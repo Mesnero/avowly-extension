@@ -1,5 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { ClerkProvider } from '@clerk/chrome-extension';
+
+import { env } from '../../lib/env.js';
 
 import '../../styles/global.css';
 
@@ -12,6 +15,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <Popup />
+    <ClerkProvider publishableKey={env.CLERK_PUBLISHABLE_KEY}>
+      <Popup />
+    </ClerkProvider>
   </StrictMode>,
 );

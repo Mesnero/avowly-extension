@@ -69,3 +69,7 @@ export async function remove(id: string): Promise<void> {
 export async function size(): Promise<number> {
   return db.prompts.count();
 }
+
+export async function clear(): Promise<void> {
+  await db.prompts.clear();
+}

@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { adapters, findAdapter } from '../registry.js';
+import { chatgptAdapter } from '../chatgpt.js';
 
 describe('adapter registry', () => {
-  it('starts empty at scaffold time', () => {
-    // This will fail (intentionally) the first time we add a real adapter.
-    // That failure is the cue to update this test alongside the new adapter.
-    expect(adapters).toEqual([]);
+  it('contains the expected list of adapters for launch', () => {
+    expect(adapters).toEqual([chatgptAdapter]);
   });
 
   it('returns undefined when no adapter matches', () => {

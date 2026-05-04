@@ -8,6 +8,12 @@ import { afterEach, beforeEach, vi } from 'vitest';
  * (configured in vitest.config.ts).
  */
 
+// Define global browser/chrome stubs at module load time to prevent webextension-polyfill
+// from throwing "This script should only be loaded in a browser extension." during imports.
+globalThis.chrome = { runtime: { id: 'test-init' } } as unknown as typeof chrome;
+// @ts-expect-error browser is not on globalThis by default
+globalThis.browser = globalThis.chrome;
+
 interface InMemoryStorage {
   data: Record<string, unknown>;
   get: (keys: string | string[] | null) => Promise<Record<string, unknown>>;

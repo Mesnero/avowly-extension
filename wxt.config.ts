@@ -13,6 +13,7 @@ import pkg from './package.json' with { type: 'json' };
 function assertProductionPublicEnv(mode: string): void {
   if (mode !== 'production') return;
   const apiUrl = process.env.WXT_PUBLIC_API_BASE_URL ?? '';
+  const clerkKey = process.env.WXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
   const debug = process.env.WXT_PUBLIC_DEBUG ?? '';
   const issues: string[] = [];
   if (!apiUrl.startsWith('https://')) {
@@ -23,6 +24,9 @@ function assertProductionPublicEnv(mode: string): void {
     );
   } else if (/^https:\/\/(localhost|127\.0\.0\.1)/i.test(apiUrl)) {
     issues.push('WXT_PUBLIC_API_BASE_URL must not point at localhost in production builds');
+  }
+  if (!clerkKey) {
+    issues.push('WXT_PUBLIC_CLERK_PUBLISHABLE_KEY must be set in production builds');
   }
   if (debug === 'true' || debug === '1') {
     issues.push(
@@ -69,7 +73,8 @@ export default defineConfig({
     permissions: ['storage', 'alarms'],
     // Host permissions are added per platform-adapter as we build them.
     // The API host is added once we have a domain.
-    host_permissions: [],
+    // Clerk requires access to its accounts domains.
+    host_permissions: ['*://*.clerk.accounts.dev/*'],
     action: {
       default_title: 'Avowly',
       default_popup: 'popup.html',

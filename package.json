@@ -29,6 +29,7 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
+    "@clerk/chrome-extension": "^3.1.21",
     "dexie": "^4.0.10",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

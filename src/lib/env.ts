@@ -14,6 +14,8 @@ import { z } from 'zod';
  */
 interface ImportMetaEnv {
   readonly WXT_PUBLIC_API_BASE_URL?: string;
+  readonly WXT_PUBLIC_CLERK_PUBLISHABLE_KEY?: string;
+  readonly WXT_PUBLIC_CLERK_SYNC_HOST?: string;
   readonly WXT_PUBLIC_DEBUG?: string;
   readonly MODE?: string;
 }
@@ -21,6 +23,8 @@ interface ImportMetaEnv {
 const schema = z
   .object({
     API_BASE_URL: z.string().url(),
+    CLERK_PUBLISHABLE_KEY: z.string().min(1, 'Clerk Publishable Key is required'),
+    CLERK_SYNC_HOST: z.string().url().min(1, 'Clerk Sync Host is required'),
     DEBUG: z
       .string()
       .optional()
@@ -43,6 +47,14 @@ const schema = z
           'production builds require https:// (got non-https). Set WXT_PUBLIC_API_BASE_URL in CI.',
       });
     }
+    if (!value.CLERK_SYNC_HOST.startsWith('https://')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CLERK_SYNC_HOST'],
+        message:
+          'production builds require https:// (got non-https). Set WXT_PUBLIC_CLERK_SYNC_HOST in CI.',
+      });
+    }
     if (/^https:\/\/(localhost|127\.0\.0\.1)/i.test(value.API_BASE_URL)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -63,6 +75,8 @@ const schema = z
 const metaEnv = import.meta.env as ImportMetaEnv;
 const raw = {
   API_BASE_URL: metaEnv.WXT_PUBLIC_API_BASE_URL,
+  CLERK_PUBLISHABLE_KEY: metaEnv.WXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  CLERK_SYNC_HOST: metaEnv.WXT_PUBLIC_CLERK_SYNC_HOST,
   DEBUG: metaEnv.WXT_PUBLIC_DEBUG,
   MODE: metaEnv.MODE,
 };

@@ -2,11 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import { assertValidMatchPattern, findAdapter } from '../src/adapters/registry.js';
 
+import { chatgptAdapter } from '../src/adapters/chatgpt.js';
+
 describe('findAdapter', () => {
-  it('returns undefined for any URL while the registry is empty', () => {
-    expect(findAdapter('https://chatgpt.com/c/abc')).toBeUndefined();
-    expect(findAdapter('https://claude.ai/chat/xyz')).toBeUndefined();
+  it('returns the correct adapter for a given URL', () => {
+    expect(findAdapter('https://chatgpt.com/c/abc')).toBe(chatgptAdapter);
+    expect(findAdapter('https://chat.openai.com/g/g-abc')).toBe(chatgptAdapter);
+  });
+
+  it('returns undefined for an unsupported URL', () => {
     expect(findAdapter('https://example.com')).toBeUndefined();
+    expect(findAdapter('https://claude.ai/chat/xyz')).toBeUndefined();
   });
 });
 

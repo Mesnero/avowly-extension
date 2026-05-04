@@ -3,6 +3,7 @@ import { createLogger } from '../lib/logger.js';
 import { enqueue, size } from '../lib/queue.js';
 import { ExtensionMessage } from '../lib/schemas.js';
 import { getSettings, setSettings } from '../lib/settings.js';
+import { onSyncTick } from './sync.js';
 
 const log = createLogger('background');
 
@@ -35,8 +36,8 @@ export function startBackground(): void {
     return true;
   });
 
-  // Periodic sync alarm. The handler is wired but is a no-op until the API
-  // sync path lands; keeps the interface stable. `chrome.alarms.create`
+  // Periodic sync alarm. The handler is wired to drain the queue iteratively
+  // to the API endpoint via POST /v1/prompts. `chrome.alarms.create`
   // returns a promise in MV3 service workers; we don't need to await — fire
   // and forget is fine for alarm registration.
   void chrome.alarms.create('sync', { periodInMinutes: 0.5 });
@@ -120,10 +121,4 @@ export async function handleMessage(
       throw new CaptureError('Unhandled message kind');
     }
   }
-}
-
-async function onSyncTick(): Promise<void> {
-  const queueSize = await size();
-  log.debug('sync tick', { queue_size: queueSize });
-  // Real drain → POST → delete-on-success lands when the API client wires up.
 }

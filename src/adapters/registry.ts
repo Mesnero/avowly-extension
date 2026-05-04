@@ -1,4 +1,5 @@
 import type { PlatformAdapter } from './base.js';
+import { chatgptAdapter } from './chatgpt.js';
 
 /**
  * Central registry of adapters. Adding a platform = importing it here and
@@ -8,7 +9,7 @@ import type { PlatformAdapter } from './base.js';
  * MVP launches with: chatgpt, claude, gemini, perplexity. Each is added in
  * its own commit with fixtures + manifest host_permissions.
  */
-export const adapters: readonly PlatformAdapter[] = [];
+export const adapters: readonly PlatformAdapter[] = [chatgptAdapter];
 
 // Validate every registered match pattern once, at module load. A bad
 // pattern (e.g., `https://*.com/*`) would silently match any HTTPS

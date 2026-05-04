@@ -23,6 +23,8 @@ export default defineConfig({
     // behavior should use vi.mock('../src/lib/env.js', ...) explicitly.
     env: {
       WXT_PUBLIC_API_BASE_URL: 'https://api.test.avowly.io',
+      WXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_mock',
+      WXT_PUBLIC_CLERK_SYNC_HOST: 'https://app.test.avowly.io',
       WXT_PUBLIC_DEBUG: 'false',
     },
     coverage: {
