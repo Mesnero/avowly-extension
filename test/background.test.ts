@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { handleMessage } from '../src/background/index.js';
 import { AuthError, CaptureError } from '../src/lib/errors.js';
 import { uuidv7 } from '../src/lib/ids.js';
-import { db } from '../src/lib/queue.js';
+import { db, deadLetter, peek } from '../src/lib/queue.js';
 import { defaultSettings, setSettings } from '../src/lib/settings.js';
 
 vi.mock('../src/lib/env.js', () => ({
@@ -148,11 +148,18 @@ describe('handleMessage — capture/error', () => {
 });
 
 describe('handleMessage — queue/status', () => {
-  it('returns the current queue size', async () => {
+  it('returns pending queue stats separately from dead-lettered rows', async () => {
     await handleMessage(validPromptMessage('a'), makeSender());
     await handleMessage(validPromptMessage('b'), makeSender());
+    const [first] = await peek(1);
+    expect(first).toBeDefined();
+    await deadLetter(first!.id, 'HTTP 400: invalid');
+
     const reply = await handleMessage({ kind: 'queue/status' }, makeSender());
-    expect(reply).toEqual({ ok: true, data: { size: 2 } });
+    expect(reply).toEqual({
+      ok: true,
+      data: { size: 1, pending: 1, deadLettered: 1, total: 2 },
+    });
   });
 });
 

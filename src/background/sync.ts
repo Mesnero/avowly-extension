@@ -1,7 +1,7 @@
 import { getAuthToken } from '../lib/auth.js';
 import { env } from '../lib/env.js';
 import { createLogger } from '../lib/logger.js';
-import { clear, markFailure, peek, remove, size } from '../lib/queue.js';
+import { clear, deadLetter, markFailure, peek, remove, totalSize } from '../lib/queue.js';
 
 const log = createLogger('sync');
 
@@ -14,7 +14,7 @@ const BATCH_SIZE = 50;
 export async function onSyncTick(): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
-    const qSize = await size();
+    const qSize = await totalSize();
     if (qSize > 0) {
       log.info('Wiping queue because user is unauthenticated', { size: qSize });
       await clear();
@@ -59,11 +59,22 @@ export async function onSyncTick(): Promise<void> {
         await clear();
         return;
       } else {
-        // Any other 4xx/5xx: abort the loop to avoid spamming the API.
-        // 429/500 will be retried on the next alarm tick; a 400 should
-        // be investigated via the dead-letter view.
         const text = await response.text().catch(() => '');
-        await markFailure(row.id, `HTTP ${String(response.status)}: ${text}`);
+        const reason = `HTTP ${String(response.status)}: ${text}`;
+
+        if (isPermanentClientError(response.status)) {
+          await deadLetter(row.id, reason);
+          log.warn('Dead-lettering prompt after permanent sync failure', {
+            id: row.id,
+            status: response.status,
+            body: text,
+          });
+          continue;
+        }
+
+        // Transient failures stop the loop so we do not spam the API.
+        // 429/5xx/network errors retry on the next alarm tick.
+        await markFailure(row.id, reason);
         log.warn('Failed to sync prompt', { id: row.id, status: response.status, body: text });
         break;
       }
@@ -74,4 +85,8 @@ export async function onSyncTick(): Promise<void> {
       break;
     }
   }
+}
+
+function isPermanentClientError(status: number): boolean {
+  return status === 400 || status === 422;
 }

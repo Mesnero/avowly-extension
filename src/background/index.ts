@@ -1,6 +1,6 @@
 import { AuthError, CaptureError, toExtensionError } from '../lib/errors.js';
 import { createLogger } from '../lib/logger.js';
-import { enqueue, size } from '../lib/queue.js';
+import { enqueue, stats } from '../lib/queue.js';
 import { ExtensionMessage } from '../lib/schemas.js';
 import { getSettings, setSettings } from '../lib/settings.js';
 import { onSyncTick } from './sync.js';
@@ -104,7 +104,8 @@ export async function handleMessage(
       return { ok: true };
     }
     case 'queue/status': {
-      return { ok: true, data: { size: await size() } };
+      const queue = await stats();
+      return { ok: true, data: { size: queue.pending, ...queue } };
     }
     case 'settings/get': {
       return { ok: true, data: await getSettings() };

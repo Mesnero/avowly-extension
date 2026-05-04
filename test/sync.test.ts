@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { onSyncTick } from '../src/background/sync.js';
 import * as auth from '../src/lib/auth.js';
 import { uuidv7 } from '../src/lib/ids.js';
-import { db, enqueue, peek, size } from '../src/lib/queue.js';
+import { db, deadLetter, enqueue, peek, size, totalSize } from '../src/lib/queue.js';
 import type { CapturedPrompt } from '../src/lib/schemas.js';
 
 function makePrompt(overrides: Partial<CapturedPrompt> = {}): CapturedPrompt {
@@ -52,6 +52,20 @@ describe('background/sync', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(await size()).toBe(0);
+  });
+
+  it('wipes dead-lettered captures if auth token is missing', async () => {
+    vi.spyOn(auth, 'getAuthToken').mockResolvedValue(null);
+    const prompt = makePrompt({ text: 'dead letter should not survive sign-out' });
+    await enqueue(prompt);
+    await deadLetter(prompt.id, 'HTTP 400: invalid');
+    expect(await size()).toBe(0);
+    expect(await totalSize()).toBe(1);
+
+    await onSyncTick();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await totalSize()).toBe(0);
   });
 
   it('drains the queue on success', async () => {
@@ -119,6 +133,58 @@ describe('background/sync', () => {
     expect(await size()).toBe(2);
     const inQueue = await peek(10);
     expect(inQueue[0]?.attempts).toBe(1);
+  });
+
+  it('treats non-validation 4xx responses as retryable', async () => {
+    await enqueue(makePrompt());
+    vi.advanceTimersByTime(1);
+    await enqueue(makePrompt());
+
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 403,
+      text: () => Promise.resolve('forbidden'),
+    });
+
+    await onSyncTick();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await peek(10)).toHaveLength(2);
+    const rows = await db.prompts.orderBy('enqueuedAt').toArray();
+    expect(rows[0]?.attempts).toBe(1);
+    expect(rows[0]?.deadLetteredAt).toBeNull();
+  });
+
+  it('dead-letters permanent 4xx errors and continues with newer prompts', async () => {
+    await enqueue(makePrompt({ text: 'bad payload' }));
+    vi.advanceTimersByTime(1);
+    await enqueue(makePrompt({ text: 'valid payload' }));
+
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        text: () => Promise.resolve('invalid prompt'),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 202,
+        json: () => Promise.resolve({ status: 'queued' }),
+      });
+
+    await onSyncTick();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    const active = await peek(10);
+    expect(active).toEqual([]);
+
+    const rows = await db.prompts.orderBy('enqueuedAt').toArray();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.payload.text).toBe('bad payload');
+    expect(rows[0]?.attempts).toBe(1);
+    expect(rows[0]?.deadLetterReason).toBe('HTTP 400: invalid prompt');
+    expect(rows[0]?.deadLetteredAt).toEqual(expect.any(Number));
   });
 
   it('stops processing on network error', async () => {
