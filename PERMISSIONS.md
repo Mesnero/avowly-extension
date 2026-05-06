@@ -16,15 +16,19 @@ Every permission this extension requests, why it's needed, and what data it give
 
 ## Host permissions (declared in manifest.host_permissions)
 
-Each host is added when the corresponding platform adapter ships. At MVP:
+Each host gates a specific outbound capability. New entries land in the same PR as the feature that needs them with a one-line rationale here.
 
-- *(empty until the first adapter lands)*
+### LLM platforms
 
-When ChatGPT adapter ships, this list will include:
-- `https://chatgpt.com/*`
-- `https://chat.openai.com/*`
+- `https://chatgpt.com/*` and `https://chat.openai.com/*` — ChatGPT adapter content script reads the prompt textarea on submit. Both hosts because OpenAI redirects between them.
+- `https://claude.ai/*` — Claude adapter (placeholder; capture wires up when the adapter ships).
+- `https://gemini.google.com/*` — Gemini adapter (placeholder).
+- `https://www.perplexity.ai/*` — Perplexity adapter (placeholder).
 
-Each new entry will be added in the same PR as the adapter that requires it, with a one-line explanation here.
+### Backend services
+
+- `https://api.avowly.io/*` — service worker `POST /v1/prompts` to sync the queue.
+- `https://*.clerk.accounts.dev/*` — Clerk session sync from the dashboard origin into the extension popup, plus background token refresh via `@clerk/chrome-extension`. Replace with the production Clerk domain once `clerk.avowly.io` is configured.
 
 ## What we do NOT request
 
