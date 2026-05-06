@@ -71,10 +71,20 @@ export default defineConfig({
     // capture data — we never run there.
     incognito: 'split',
     permissions: ['storage', 'alarms'],
-    // Host permissions are added per platform-adapter as we build them.
-    // The API host is added once we have a domain.
-    // Clerk requires access to its accounts domains.
-    host_permissions: ['*://*.clerk.accounts.dev/*'],
+    // Host permissions match the LLM platforms the adapters target plus
+    // the API origin and Clerk's accounts domains. Production is HTTPS
+    // only — `*://` would invite store reviewers to flag the schema as
+    // over-broad. Add a host here only when an adapter or service-worker
+    // call needs it, and document the rationale in PERMISSIONS.md.
+    host_permissions: [
+      'https://chatgpt.com/*',
+      'https://chat.openai.com/*',
+      'https://claude.ai/*',
+      'https://gemini.google.com/*',
+      'https://www.perplexity.ai/*',
+      'https://api.avowly.io/*',
+      'https://*.clerk.accounts.dev/*',
+    ],
     action: {
       default_title: 'Avowly',
       default_popup: 'popup.html',

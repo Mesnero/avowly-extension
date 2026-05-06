@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { onSyncTick } from '../src/background/sync.js';
 import * as auth from '../src/lib/auth.js';
 import { uuidv7 } from '../src/lib/ids.js';
-import { db, deadLetter, enqueue, peek, size, totalSize } from '../src/lib/queue.js';
+import { db, deadLetter, enqueue, peek, size } from '../src/lib/queue.js';
 import type { CapturedPrompt } from '../src/lib/schemas.js';
 
 function makePrompt(overrides: Partial<CapturedPrompt> = {}): CapturedPrompt {
@@ -42,7 +42,7 @@ describe('background/sync', () => {
     expect(await size()).toBe(0);
   });
 
-  it('wipes the queue if auth token is missing and captures are pending', async () => {
+  it('holds the queue when auth token is missing — does not wipe', async () => {
     vi.spyOn(auth, 'getAuthToken').mockResolvedValue(null);
     await enqueue(makePrompt());
     await enqueue(makePrompt());
@@ -50,22 +50,24 @@ describe('background/sync', () => {
 
     await onSyncTick();
 
+    // No fetch and no wipe: a missing token may be a transient
+    // refresh blip, not a real sign-out. The 401 handler is the only
+    // path that destroys local captures.
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(await size()).toBe(0);
+    expect(await size()).toBe(2);
   });
 
-  it('wipes dead-lettered captures if auth token is missing', async () => {
+  it('does not touch dead-lettered captures when the auth token is missing', async () => {
     vi.spyOn(auth, 'getAuthToken').mockResolvedValue(null);
-    const prompt = makePrompt({ text: 'dead letter should not survive sign-out' });
+    const prompt = makePrompt({ text: 'dead letter survives token blip' });
     await enqueue(prompt);
     await deadLetter(prompt.id, 'HTTP 400: invalid');
-    expect(await size()).toBe(0);
-    expect(await totalSize()).toBe(1);
 
     await onSyncTick();
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(await totalSize()).toBe(0);
+    const row = await db.prompts.get(prompt.id);
+    expect(row?.deadLetterReason).toBe('HTTP 400: invalid');
   });
 
   it('drains the queue on success', async () => {

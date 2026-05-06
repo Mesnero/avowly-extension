@@ -55,7 +55,6 @@ describe('ChatGPT Adapter', () => {
     const sendButton = document.querySelector<HTMLButtonElement>('#composer-submit-button')!;
     expect(sendButton).not.toBeNull();
 
-    // Simulate click
     sendButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
     expect(emitMock).toHaveBeenCalledTimes(1);
@@ -69,16 +68,11 @@ describe('ChatGPT Adapter', () => {
     handle.dispose();
   });
 
-  it('captures prompt on Enter keydown in textarea', () => {
+  it('captures prompt on form submit (programmatic / Enter via React handler)', () => {
     const handle = chatgptAdapter.init(ctx);
 
-    const textarea = document.querySelector<HTMLDivElement>('#prompt-textarea')!;
-    expect(textarea).not.toBeNull();
-
-    // Simulate Enter keydown
-    textarea.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
-    );
+    const form = document.querySelector('form')!;
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
 
     expect(emitMock).toHaveBeenCalledTimes(1);
     expect(emitMock).toHaveBeenCalledWith(
@@ -91,26 +85,54 @@ describe('ChatGPT Adapter', () => {
     handle.dispose();
   });
 
-  it('does NOT capture on Shift+Enter keydown', () => {
+  it('emits once when click and submit fire for the same user action', () => {
+    const handle = chatgptAdapter.init(ctx);
+
+    const sendButton = document.querySelector<HTMLButtonElement>('#composer-submit-button')!;
+    const form = document.querySelector('form')!;
+
+    sendButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true }));
+
+    expect(emitMock).toHaveBeenCalledTimes(1);
+    handle.dispose();
+  });
+
+  it('does NOT capture on Enter keydown — submit/click is the only signal', () => {
     const handle = chatgptAdapter.init(ctx);
     const textarea = document.querySelector<HTMLDivElement>('#prompt-textarea')!;
 
     textarea.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true }),
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }),
     );
 
     expect(emitMock).not.toHaveBeenCalled();
     handle.dispose();
   });
 
-  it('does NOT capture empty prompts', () => {
+  it('does NOT capture empty prompts on submit', () => {
     const handle = chatgptAdapter.init(ctx);
     const textarea = document.querySelector<HTMLDivElement>('#prompt-textarea')!;
-    textarea.innerHTML = '    <br>    '; // Empty text content
+    // Replace the text content with whitespace; innerText.trim() will
+    // return '' so capture should be a no-op.
+    textarea.replaceChildren(document.createTextNode('   '));
 
-    textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const form = document.querySelector('form')!;
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true }));
 
     expect(emitMock).not.toHaveBeenCalled();
+    handle.dispose();
+  });
+
+  it('emits a UUIDv7 idempotency key', () => {
+    const handle = chatgptAdapter.init(ctx);
+    const form = document.querySelector('form')!;
+    form.dispatchEvent(new SubmitEvent('submit', { bubbles: true }));
+
+    expect(emitMock).toHaveBeenCalledTimes(1);
+    const id = (emitMock.mock.calls[0]?.[0] as { id: string } | undefined)?.id ?? '';
+    // UUIDv7: third group starts with `7`.
+    expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     handle.dispose();
   });
 });

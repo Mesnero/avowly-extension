@@ -58,6 +58,14 @@ class Database extends Dexie {
 
 export const db = new Database();
 
+/**
+ * Cap on transient retry attempts before a row is promoted to the
+ * dead-letter view. Hit only by 5xx / network failures — permanent 4xx
+ * codes go to dead-letter immediately via `deadLetter()`. Documented in
+ * `06-extension-design.md` ("max 5 attempts → failed queue").
+ */
+export const MAX_TRANSIENT_ATTEMPTS = 5;
+
 /** Add a freshly captured prompt to the queue. Idempotent on `id`. */
 export async function enqueue(prompt: CapturedPrompt): Promise<void> {
   CapturedPrompt.parse(prompt);
@@ -88,6 +96,13 @@ export async function markFailure(id: string, error: string): Promise<void> {
     .modify((row) => {
       row.attempts += 1;
       row.lastError = error;
+      // Promote to dead-letter once the transient retry budget is
+      // exhausted. Without this, a row that keeps hitting 5xx / network
+      // errors retries every alarm tick forever.
+      if (row.attempts >= MAX_TRANSIENT_ATTEMPTS && !row.deadLetteredAt) {
+        row.deadLetteredAt = Date.now();
+        row.deadLetterReason = `Exceeded ${String(MAX_TRANSIENT_ATTEMPTS)} attempts: ${error}`;
+      }
     });
 }
 

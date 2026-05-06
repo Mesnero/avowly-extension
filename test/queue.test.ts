@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { uuidv7 } from '../src/lib/ids.js';
 import {
+  MAX_TRANSIENT_ATTEMPTS,
   db,
   deadLetter,
   deadLetterSize,
@@ -112,6 +113,22 @@ describe('queue.markFailure', () => {
     const row = await db.prompts.get(prompt.id);
     expect(row?.attempts).toBe(2);
     expect(row?.lastError).toBe('second attempt failed');
+    expect(row?.deadLetteredAt).toBeNull();
+  });
+
+  it('promotes the row to dead-letter once the transient cap is reached', async () => {
+    const prompt = makePrompt();
+    await enqueue(prompt);
+
+    for (let i = 0; i < MAX_TRANSIENT_ATTEMPTS; i++) {
+      await markFailure(prompt.id, `attempt ${String(i + 1)} failed`);
+    }
+
+    const row = await db.prompts.get(prompt.id);
+    expect(row?.attempts).toBe(MAX_TRANSIENT_ATTEMPTS);
+    expect(row?.deadLetteredAt).toEqual(expect.any(Number));
+    expect(row?.deadLetterReason).toContain(`Exceeded ${String(MAX_TRANSIENT_ATTEMPTS)} attempts`);
+    expect(await peek(10)).toEqual([]);
   });
 });
 

@@ -1,3 +1,5 @@
+import { uuidv7 } from '../lib/ids.js';
+
 import type { AdapterContext, AdapterHandle, PlatformAdapter } from './base.js';
 
 export const chatgptAdapter: PlatformAdapter = {
@@ -22,45 +24,54 @@ export const chatgptAdapter: PlatformAdapter = {
       return text.length > 0 ? text : null;
     }
 
+    // A single user action (clicking the send button) can fire both
+    // `click` and `submit` on the same form. Dedupe within a short
+    // window so we emit once per user submission, not once per event.
+    const DEDUP_WINDOW_MS = 200;
+    let lastCapturedAt = 0;
+
     function captureAndEmit() {
+      const now = Date.now();
+      if (now - lastCapturedAt < DEDUP_WINDOW_MS) return;
       const text = extractPromptText();
       if (!text) return;
 
+      lastCapturedAt = now;
       ctx.log.debug('capturing chatgpt prompt', { length: text.length });
       ctx.emit({
-        id: crypto.randomUUID(),
+        id: uuidv7(),
         platform: 'chatgpt',
         text,
-        capturedAt: Date.now(),
+        capturedAt: now,
       });
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      // ChatGPT submits on 'Enter' (without Shift) unless the user is still composing an IME character.
-      if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
-        return;
-      }
-
-      const target = event.target as Element | null;
-      if (target?.matches(PROMPT_TEXTAREA_SELECTOR)) {
-        // Run capture before the React event loop clears the textarea value
-        captureAndEmit();
-      }
     }
 
     function handleClick(event: MouseEvent) {
       const target = event.target as Element | null;
       if (!target) return;
 
-      // Check if the clicked element or its ancestor is the send button
+      // Capture only when the actual send button is clicked (or its
+      // descendant icon). ChatGPT funnels Enter through the same React
+      // submit handler that fires the click, so this single hook covers
+      // mouse, keyboard Enter, and voice-input submission paths.
       if (target.closest(SEND_BUTTON_SELECTOR)) {
         captureAndEmit();
       }
     }
 
-    // Attach in capture phase to intercept events before React handlers clear the input
-    document.addEventListener('keydown', handleKeyDown, { capture: true, signal: ctx.signal });
+    function handleSubmit(event: SubmitEvent) {
+      // Belt-and-braces: any <form> ancestor of the prompt area firing
+      // a real submit event also triggers a capture. Covers programmatic
+      // submits and any future UI variant that swaps the visible button
+      // for a different element while keeping a real form.
+      const form = event.target as Element | null;
+      if (form?.querySelector(PROMPT_TEXTAREA_SELECTOR)) {
+        captureAndEmit();
+      }
+    }
+
     document.addEventListener('click', handleClick, { capture: true, signal: ctx.signal });
+    document.addEventListener('submit', handleSubmit, { capture: true, signal: ctx.signal });
 
     return {
       dispose() {

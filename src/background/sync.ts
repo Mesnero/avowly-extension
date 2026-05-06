@@ -1,7 +1,7 @@
 import { getAuthToken } from '../lib/auth.js';
 import { env } from '../lib/env.js';
 import { createLogger } from '../lib/logger.js';
-import { clear, deadLetter, markFailure, peek, remove, totalSize } from '../lib/queue.js';
+import { clear, deadLetter, markFailure, peek, remove } from '../lib/queue.js';
 
 const log = createLogger('sync');
 
@@ -14,13 +14,11 @@ const BATCH_SIZE = 50;
 export async function onSyncTick(): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
-    const qSize = await totalSize();
-    if (qSize > 0) {
-      log.info('Wiping queue because user is unauthenticated', { size: qSize });
-      await clear();
-    } else {
-      log.debug('Skipping sync tick: no auth token available');
-    }
+    // Hold the queue until either (a) the user signs back in and the
+    // next tick drains it or (b) the API actively rejects with 401 and
+    // the handler below clears it. Wiping here would destroy local
+    // captures during a transient Clerk-token-refresh blip.
+    log.debug('Skipping sync tick: no auth token available');
     return;
   }
 
