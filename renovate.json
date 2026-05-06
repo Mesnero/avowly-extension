@@ -1,6 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":semanticCommits", ":dependencyDashboard"],
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    "helpers:pinGitHubActionDigests"
+  ],
   "timezone": "Europe/Berlin",
   "schedule": ["before 6am on monday"],
   "labels": ["dependencies"],
@@ -26,10 +31,21 @@
       "matchUpdateTypes": ["major"],
       "addLabels": ["dependencies-major"],
       "minimumReleaseAge": "7 days"
+    },
+    {
+      "description": "Auto-merge pin-to-SHA PRs filed by helpers:pinGitHubActionDigests so the workflows do not drift back to floating tags.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["pinDigest", "digest"],
+      "automerge": true,
+      "automergeType": "branch",
+      "platformAutomerge": true
     }
   ],
   "vulnerabilityAlerts": {
     "labels": ["security"],
-    "schedule": ["at any time"]
+    "schedule": ["at any time"],
+    "automerge": true,
+    "automergeType": "branch",
+    "platformAutomerge": true
   }
 }

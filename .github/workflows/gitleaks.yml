@@ -19,7 +19,7 @@ jobs:
       # official release checksums file. Bump in lockstep with GITLEAKS_VERSION.
       GITLEAKS_SHA256: '3e169b49f7c519a269b8ff653c5248a8c82e8c74baaf035286915047200386a9'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
       # Run gitleaks as a downloaded binary, not via the
